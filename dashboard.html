@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Nobelian Admin Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="css/admin.css">
+
+<script defer src="js/auth.js"></script>
+<script defer src="js/app.js"></script>
+
+</head>
+
+<body>
+
+<div class="admin-layout">
+
+<!-- SIDEBAR -->
+
+<aside class="sidebar">
+
+<div class="sidebar-logo">
+<h2>Nobelian</h2>
+<p>Admin</p>
+</div>
+
+<nav class="sidebar-nav">
+
+<a href="/dashboard.html" class="nav-item active">
+Dashboard
+</a>
+
+<a href="/products.html" class="nav-item">
+Products
+</a>
+
+<a href="/collections.html" class="nav-item">
+Collections
+</a>
+
+<a href="/media.html" class="nav-item">
+Media
+</a>
+
+</nav>
+
+<div class="sidebar-footer">
+
+<button id="logoutButton" class="logout-button">
+Logout
+</button>
+
+</div>
+
+</aside>
+
+
+<!-- MAIN CONTENT -->
+
+<div class="main-content">
+
+<header class="topbar">
+
+<h1>Dashboard</h1>
+
+<div class="admin-user">
+Admin Panel
+</div>
+
+</header>
+
+
+<section class="dashboard-content">
+
+<div class="stats-grid">
+
+<div class="stat-card">
+<h3>Total Products</h3>
+<p id="totalProducts">--</p>
+</div>
+
+<div class="stat-card">
+<h3>Total Collections</h3>
+<p id="totalCollections">--</p>
+</div>
+
+<div class="stat-card">
+<h3>Total Images</h3>
+<p id="totalImages">--</p>
+</div>
+
+<div class="stat-card">
+<h3>Orders (future)</h3>
+<p>--</p>
+</div>
+
+</div>
+
+</section>
+
+</div>
+
+</div>
+
+
+<script>
+
+const token = localStorage.getItem("admin_token");
+
+if (!token) {
+  window.location.href = "/login.html";
+}
+
+async function loadDashboardStats(){
+
+try {
+
+const productsRes = await fetch("https://api.nobelian.com/products",{
+headers:{
+Authorization: `Bearer ${token}`
+}
+});
+
+const products = await productsRes.json();
+
+document.getElementById("totalProducts").innerText = products.length;
+
+
+const collectionsRes = await fetch("https://api.nobelian.com/collections",{
+headers:{
+Authorization: `Bearer ${token}`
+}
+});
+
+const collections = await collectionsRes.json();
+
+document.getElementById("totalCollections").innerText = collections.length;
+
+
+} catch(err){
+
+console.error("Dashboard error:", err);
+
+}
+
+}
+
+document.getElementById("logoutButton").addEventListener("click", ()=>{
+
+localStorage.removeItem("admin_token");
+
+window.location.href = "/login.html";
+
+});
+
+
+loadDashboardStats();
+
+</script>
+
+</body>
+</html>

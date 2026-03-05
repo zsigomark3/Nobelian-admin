@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Nobelian Admin - Collections</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="css/admin.css">
+<script defer src="js/auth.js"></script>
+
+</head>
+
+<body>
+
+<div class="admin-layout">
+
+<!-- SIDEBAR -->
+
+<aside class="sidebar">
+
+<div class="sidebar-logo">
+<h2>Nobelian</h2>
+<p>Admin</p>
+</div>
+
+<nav class="sidebar-nav">
+
+<a href="/dashboard.html" class="nav-item">
+Dashboard
+</a>
+
+<a href="/products.html" class="nav-item">
+Products
+</a>
+
+<a href="/collections.html" class="nav-item active">
+Collections
+</a>
+
+<a href="/media.html" class="nav-item">
+Media
+</a>
+
+</nav>
+
+<div class="sidebar-footer">
+<button id="logoutButton" class="logout-button">Logout</button>
+</div>
+
+</aside>
+
+
+<!-- MAIN CONTENT -->
+
+<div class="main-content">
+
+<header class="topbar">
+<h1>Collections</h1>
+</header>
+
+
+<section class="collection-create">
+
+<h3>Create Collection</h3>
+
+<input 
+type="text"
+id="collectionName"
+placeholder="Collection name">
+
+<button id="createCollectionButton" class="create-button">
+Create
+</button>
+
+</section>
+
+
+<section class="collections-list">
+
+<h3>Existing Collections</h3>
+
+<table class="collections-table">
+
+<thead>
+<tr>
+<th>Name</th>
+<th>Actions</th>
+</tr>
+</thead>
+
+<tbody id="collectionsTable">
+
+<tr>
+<td colspan="2">Loading collections...</td>
+</tr>
+
+</tbody>
+
+</table>
+
+</section>
+
+</div>
+
+</div>
+
+
+<script>
+
+const token = localStorage.getItem("admin_token");
+
+if(!token){
+window.location.href="/login.html";
+}
+
+
+document.getElementById("logoutButton").addEventListener("click",()=>{
+
+localStorage.removeItem("admin_token");
+
+window.location.href="/login.html";
+
+});
+
+
+async function loadCollections(){
+
+try{
+
+const res = await fetch("https://api.nobelian.com/collections",{
+
+headers:{
+Authorization:`Bearer ${token}`
+}
+
+});
+
+const collections = await res.json();
+
+const table = document.getElementById("collectionsTable");
+
+table.innerHTML="";
+
+collections.forEach(collection=>{
+
+const row = document.createElement("tr");
+
+row.innerHTML = `
+
+<td>${collection.name}</td>
+
+<td>
+
+<button onclick="deleteCollection('${collection.id}')" class="delete-btn">
+Delete
+</button>
+
+</td>
+
+`;
+
+table.appendChild(row);
+
+});
+
+}catch(err){
+
+console.error("Collections load error:",err);
+
+}
+
+}
+
+
+document.getElementById("createCollectionButton").addEventListener("click", async ()=>{
+
+const name = document.getElementById("collectionName").value;
+
+if(!name){
+
+alert("Enter collection name");
+
+return;
+
+}
+
+try{
+
+await fetch("https://api.nobelian.com/collections",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json",
+Authorization:`Bearer ${token}`
+},
+
+body:JSON.stringify({name})
+
+});
+
+document.getElementById("collectionName").value="";
+
+loadCollections();
+
+}catch(err){
+
+console.error("Create collection error:",err);
+
+}
+
+});
+
+
+async function deleteCollection(id){
+
+if(!confirm("Delete this collection?")) return;
+
+await fetch(`https://api.nobelian.com/collections/${id}`,{
+
+method:"DELETE",
+
+headers:{
+Authorization:`Bearer ${token}`
+}
+
+});
+
+loadCollections();
+
+}
+
+
+loadCollections();
+
+</script>
+
+</body>
+</html>

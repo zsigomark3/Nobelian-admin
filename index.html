@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Nobelian Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="css/admin.css">
+
+  <script defer src="js/auth.js"></script>
+</head>
+
+<body>
+
+<div class="loading-container">
+  <h1>Nobelian Admin</h1>
+  <p>Loading...</p>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+
+    const token = localStorage.getItem("admin_token");
+
+    if (!token) {
+      window.location.href = "/login.html";
+    } else {
+      window.location.href = "/dashboard.html";
+    }
+
+  });
+</script>
+
+</body>
+</html>

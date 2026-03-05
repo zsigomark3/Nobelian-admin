@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Nobelian Admin - Media</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="css/admin.css">
+
+<script defer src="js/auth.js"></script>
+
+</head>
+
+<body>
+
+<div class="admin-layout">
+
+<!-- SIDEBAR -->
+
+<aside class="sidebar">
+
+<div class="sidebar-logo">
+<h2>Nobelian</h2>
+<p>Admin</p>
+</div>
+
+<nav class="sidebar-nav">
+
+<a href="/dashboard.html" class="nav-item">
+Dashboard
+</a>
+
+<a href="/products.html" class="nav-item">
+Products
+</a>
+
+<a href="/collections.html" class="nav-item">
+Collections
+</a>
+
+<a href="/media.html" class="nav-item active">
+Media
+</a>
+
+</nav>
+
+<div class="sidebar-footer">
+<button id="logoutButton" class="logout-button">Logout</button>
+</div>
+
+</aside>
+
+
+<!-- MAIN CONTENT -->
+
+<div class="main-content">
+
+<header class="topbar">
+<h1>Media Library</h1>
+</header>
+
+
+<section class="media-upload">
+
+<h3>Upload Image</h3>
+
+<input type="file" id="imageFile">
+
+<button id="uploadButton" class="upload-button">
+Upload
+</button>
+
+<p id="uploadStatus"></p>
+
+</section>
+
+
+<section class="media-library">
+
+<h3>Media Files</h3>
+
+<div id="mediaGrid" class="media-grid">
+
+<p>Loading images...</p>
+
+</div>
+
+</section>
+
+</div>
+
+</div>
+
+
+<script>
+
+const token = localStorage.getItem("admin_token");
+
+if(!token){
+window.location.href="/login.html";
+}
+
+
+
+document.getElementById("logoutButton").addEventListener("click",()=>{
+
+localStorage.removeItem("admin_token");
+
+window.location.href="/login.html";
+
+});
+
+
+
+document.getElementById("uploadButton").addEventListener("click", async ()=>{
+
+const fileInput = document.getElementById("imageFile");
+
+const file = fileInput.files[0];
+
+if(!file){
+
+alert("Select a file");
+
+return;
+
+}
+
+const formData = new FormData();
+
+formData.append("file", file);
+
+document.getElementById("uploadStatus").innerText="Uploading...";
+
+try{
+
+const res = await fetch("https://api.nobelian.com/upload",{
+
+method:"POST",
+
+headers:{
+Authorization:`Bearer ${token}`
+},
+
+body:formData
+
+});
+
+const data = await res.json();
+
+document.getElementById("uploadStatus").innerText="Upload successful";
+
+loadMedia();
+
+}catch(err){
+
+console.error("Upload error:",err);
+
+document.getElementById("uploadStatus").innerText="Upload failed";
+
+}
+
+});
+
+
+
+async function loadMedia(){
+
+try{
+
+const res = await fetch("https://api.nobelian.com/media",{
+
+headers:{
+Authorization:`Bearer ${token}`
+}
+
+});
+
+const media = await res.json();
+
+const grid = document.getElementById("mediaGrid");
+
+grid.innerHTML="";
+
+media.forEach(item=>{
+
+const div = document.createElement("div");
+
+div.className="media-item";
+
+div.innerHTML = `
+
+<img src="${item.url}" class="media-thumb">
+
+<input type="text" value="${item.url}" readonly>
+
+`;
+
+grid.appendChild(div);
+
+});
+
+}catch(err){
+
+console.error("Media load error:",err);
+
+}
+
+}
+
+
+loadMedia();
+
+</script>
+
+</body>
+</html>

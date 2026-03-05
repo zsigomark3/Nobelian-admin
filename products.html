@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Nobelian Admin - Products</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="css/admin.css">
+
+<script defer src="js/auth.js"></script>
+<script defer src="js/products.js"></script>
+
+</head>
+
+<body>
+
+<div class="admin-layout">
+
+<!-- SIDEBAR -->
+
+<aside class="sidebar">
+
+<div class="sidebar-logo">
+<h2>Nobelian</h2>
+<p>Admin</p>
+</div>
+
+<nav class="sidebar-nav">
+
+<a href="/dashboard.html" class="nav-item">
+Dashboard
+</a>
+
+<a href="/products.html" class="nav-item active">
+Products
+</a>
+
+<a href="/collections.html" class="nav-item">
+Collections
+</a>
+
+<a href="/media.html" class="nav-item">
+Media
+</a>
+
+</nav>
+
+<div class="sidebar-footer">
+
+<button id="logoutButton" class="logout-button">
+Logout
+</button>
+
+</div>
+
+</aside>
+
+
+<!-- MAIN CONTENT -->
+
+<div class="main-content">
+
+<header class="topbar">
+
+<h1>Products</h1>
+
+<a href="/product-edit.html" class="create-button">
++ New Product
+</a>
+
+</header>
+
+
+<section class="products-content">
+
+<table class="products-table">
+
+<thead>
+<tr>
+<th>Image</th>
+<th>Name</th>
+<th>Price</th>
+<th>Collection</th>
+<th>Actions</th>
+</tr>
+</thead>
+
+<tbody id="productsTableBody">
+
+<tr>
+<td colspan="5">Loading products...</td>
+</tr>
+
+</tbody>
+
+</table>
+
+</section>
+
+</div>
+
+</div>
+
+
+<script>
+
+const token = localStorage.getItem("admin_token");
+
+if(!token){
+window.location.href="/login.html";
+}
+
+
+async function loadProducts(){
+
+try{
+
+const response = await fetch("https://api.nobelian.com/products",{
+headers:{
+Authorization:`Bearer ${token}`
+}
+});
+
+const products = await response.json();
+
+const table = document.getElementById("productsTableBody");
+
+table.innerHTML="";
+
+products.forEach(product=>{
+
+const row = document.createElement("tr");
+
+row.innerHTML=`
+
+<td>
+<img src="${product.image || ''}" class="product-thumb">
+</td>
+
+<td>
+${product.name}
+</td>
+
+<td>
+€ ${product.price}
+</td>
+
+<td>
+${product.collection || "-"}
+</td>
+
+<td>
+
+<a href="/product-edit.html?id=${product.id}" class="edit-btn">
+Edit
+</a>
+
+<button onclick="deleteProduct('${product.id}')" class="delete-btn">
+Delete
+</button>
+
+</td>
+
+`;
+
+table.appendChild(row);
+
+});
+
+}catch(err){
+
+console.error("Products load error:",err);
+
+}
+
+}
+
+
+async function deleteProduct(id){
+
+if(!confirm("Delete this product?")) return;
+
+await fetch(`https://api.nobelian.com/products/${id}`,{
+method:"DELETE",
+headers:{
+Authorization:`Bearer ${token}`
+}
+});
+
+loadProducts();
+
+}
+
+
+document.getElementById("logoutButton").addEventListener("click",()=>{
+
+localStorage.removeItem("admin_token");
+
+window.location.href="/login.html";
+
+});
+
+
+loadProducts();
+
+</script>
+
+</body>
+</html>
