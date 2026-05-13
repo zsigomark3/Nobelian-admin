@@ -1,5 +1,7 @@
 /* =========================================
    Nobelian Backoffice - Media Manager
+   
+   Depends on: security.js, api.js, auth.js
 ========================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -10,6 +12,21 @@ document.addEventListener("DOMContentLoaded", () => {
   loadMedia();
 
 });
+
+
+/* =========================================
+   Resolve media URL
+   Backend stores relative paths like /cloud/filename.jpg
+   We need to prefix with the backend base URL
+========================================= */
+
+function resolveMediaUrl(url) {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  return API_BASE.replace("/api", "") + url;
+}
 
 
 /* =========================================
@@ -34,6 +51,22 @@ function setupUpload() {
       return;
     }
 
+    // Client-side file type validation
+    const allowedTypes = [
+      "image/jpeg", "image/png", "image/gif",
+      "image/webp", "image/svg+xml", "image/avif"
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      alert("Only image files are allowed (JPEG, PNG, GIF, WebP, SVG, AVIF)");
+      return;
+    }
+
+    // Client-side file size validation (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File size must be 10MB or less");
+      return;
+    }
+
     const token = Auth.getToken();
 
     const formData = new FormData();
@@ -43,7 +76,7 @@ function setupUpload() {
 
     try {
 
-      const response = await fetch("https://api.nobelian.com/upload", {
+      const response = await fetch(`${API_BASE}/media`, {
 
         method: "POST",
 
@@ -55,10 +88,17 @@ function setupUpload() {
 
       });
 
+      // Handle 401
+      if (response.status === 401) {
+        localStorage.removeItem("admin_token");
+        window.location.href = "/login.html?reason=unauthorized";
+        return;
+      }
+
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Upload failed");
+        throw new Error(data.error || data.message || "Upload failed");
       }
 
       status.innerText = "Upload successful";
@@ -71,7 +111,7 @@ function setupUpload() {
 
       console.error("Upload error:", error);
 
-      status.innerText = "Upload failed";
+      status.innerText = "Upload failed: " + escapeHtml(error.message);
 
     }
 
@@ -108,23 +148,34 @@ async function loadMedia() {
 
     media.forEach(item => {
 
+      const fullUrl = resolveMediaUrl(item.url);
+
+      const safeUrl = escapeAttr(fullUrl);
+      const safeAlt = escapeAttr(item.alt_text || item.original_name || "");
+      const safeId = escapeAttr(item.id);
+
       const div = document.createElement("div");
 
       div.className = "media-item";
 
       div.innerHTML = `
-        <img src="${item.url}" class="media-thumb">
+        <img src="${safeUrl}" class="media-thumb" alt="${safeAlt}">
 
         <input 
           type="text" 
-          value="${item.url}" 
+          value="${safeUrl}" 
           readonly
+          onclick="this.select()"
         >
+
+        <button class="delete-btn" data-id="${safeId}">Delete</button>
       `;
 
       grid.appendChild(div);
 
     });
+
+    attachMediaDeleteHandlers();
 
   } catch (error) {
 
@@ -133,5 +184,42 @@ async function loadMedia() {
     grid.innerHTML = "<p>Failed to load media</p>";
 
   }
+
+}
+
+
+/* =========================================
+   Delete Media
+========================================= */
+
+function attachMediaDeleteHandlers() {
+
+  const buttons = document.querySelectorAll(".media-item .delete-btn");
+
+  buttons.forEach(button => {
+
+    button.addEventListener("click", async () => {
+
+      const id = button.dataset.id;
+
+      if (!confirm("Delete this image?")) return;
+
+      try {
+
+        await API.delete(`/media/${encodeURIComponent(id)}`);
+
+        loadMedia();
+
+      } catch (error) {
+
+        console.error("Delete media error:", error);
+
+        alert("Failed to delete image");
+
+      }
+
+    });
+
+  });
 
 }

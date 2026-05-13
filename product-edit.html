@@ -4,9 +4,12 @@
 <meta charset="UTF-8">
 <title>Nobelian Admin - Product Editor</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://nobelian-be.fly.dev data:; connect-src https://nobelian-be.fly.dev; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';">
 
 <link rel="stylesheet" href="css/admin.css">
 
+<script defer src="js/security.js"></script>
+<script defer src="js/api.js"></script>
 <script defer src="js/auth.js"></script>
 </head>
 
@@ -41,6 +44,10 @@ Collections
 Media
 </a>
 
+<a href="/orders.html" class="nav-item">
+Orders
+</a>
+
 </nav>
 
 <div class="sidebar-footer">
@@ -65,27 +72,61 @@ Media
 
 <div class="form-group">
 <label>Product Name</label>
-<input type="text" id="name" required>
+<input type="text" id="name" required maxlength="200">
+</div>
+
+<div class="form-group">
+<label>Slug (auto-generated if empty)</label>
+<input type="text" id="slug" placeholder="leave-empty-for-auto" maxlength="200" pattern="[a-z0-9\-]*">
 </div>
 
 <div class="form-group">
 <label>Price (€)</label>
-<input type="number" id="price" required>
+<input type="number" id="price" step="0.01" min="0" max="999999" required>
+</div>
+
+<div class="form-group">
+<label>Currency</label>
+<input type="text" id="currency" value="EUR" maxlength="3">
 </div>
 
 <div class="form-group">
 <label>Collection</label>
-<input type="text" id="collection">
+<select id="collectionId">
+<option value="">-- No collection --</option>
+</select>
 </div>
 
 <div class="form-group">
-<label>Image URL</label>
-<input type="text" id="image">
+<label>Category</label>
+<input type="text" id="category" placeholder="e.g. scarf, gloves, bag" maxlength="100">
+</div>
+
+<div class="form-group">
+<label>Image URLs (one per line)</label>
+<textarea id="images" rows="3" placeholder="https://..."></textarea>
+</div>
+
+<div class="form-group">
+<label>Materials (comma separated)</label>
+<input type="text" id="materials" placeholder="silk, cashmere" maxlength="500">
 </div>
 
 <div class="form-group">
 <label>Description</label>
-<textarea id="description" rows="5"></textarea>
+<textarea id="description" rows="5" maxlength="5000"></textarea>
+</div>
+
+<div class="form-group">
+<label>
+<input type="checkbox" id="inStock" checked> In Stock
+</label>
+</div>
+
+<div class="form-group">
+<label>
+<input type="checkbox" id="featured"> Featured
+</label>
 </div>
 
 <div class="form-actions">
@@ -121,97 +162,173 @@ window.location.href="/login.html";
 const params = new URLSearchParams(window.location.search);
 const productId = params.get("id");
 
-
-if(productId){
-document.getElementById("pageTitle").innerText="Edit Product";
-loadProduct();
+// Validate productId format (MongoDB ObjectId = 24 hex chars)
+if (productId && !/^[a-f0-9]{24}$/.test(productId)) {
+  alert("Invalid product ID");
+  window.location.href = "/products.html";
 }
 
 
+if(productId){
+document.getElementById("pageTitle").innerText="Edit Product";
+}
+
+// Load collections for the dropdown
+async function loadCollections(){
+try {
+const res = await fetch(`${API_BASE}/collections`, {
+headers: { Authorization: `Bearer ${token}` }
+});
+if (res.status === 401) {
+  localStorage.removeItem("admin_token");
+  window.location.href = "/login.html?reason=unauthorized";
+  return;
+}
+const collections = await res.json();
+const select = document.getElementById("collectionId");
+collections.forEach(c => {
+const opt = document.createElement("option");
+opt.value = c.id;
+opt.textContent = c.name; // textContent is XSS-safe
+select.appendChild(opt);
+});
+} catch(err) {
+console.error("Load collections error:", err);
+}
+}
+
 async function loadProduct(){
-
 try{
-
-const res = await fetch(`https://api.nobelian.com/products/${productId}`,{
+const res = await fetch(`${API_BASE}/products/${encodeURIComponent(productId)}`,{
 headers:{
 Authorization:`Bearer ${token}`
 }
 });
 
+if (res.status === 401) {
+  localStorage.removeItem("admin_token");
+  window.location.href = "/login.html?reason=unauthorized";
+  return;
+}
+
 const product = await res.json();
 
-document.getElementById("name").value = product.name;
-document.getElementById("price").value = product.price;
-document.getElementById("collection").value = product.collection || "";
-document.getElementById("image").value = product.image || "";
+// Using .value assignment (XSS-safe for input elements)
+document.getElementById("name").value = product.name || "";
+document.getElementById("slug").value = product.slug || "";
+document.getElementById("price").value = product.price || "";
+document.getElementById("currency").value = product.currency || "EUR";
+document.getElementById("collectionId").value = product.collection_id || "";
+document.getElementById("category").value = product.category || "";
+document.getElementById("images").value = (product.images || []).join("\n");
+document.getElementById("materials").value = (product.materials || []).join(", ");
 document.getElementById("description").value = product.description || "";
+document.getElementById("inStock").checked = product.in_stock !== false;
+document.getElementById("featured").checked = product.featured === true;
 
 }catch(err){
-
 console.error("Load product error:",err);
-
+}
 }
 
-}
 
+// Initialize
+loadCollections().then(() => {
+if(productId) loadProduct();
+});
 
 
 document.getElementById("productForm").addEventListener("submit", async function(e){
 
 e.preventDefault();
 
+const imagesRaw = document.getElementById("images").value.trim();
+const imagesArr = imagesRaw ? imagesRaw.split("\n").map(s => s.trim()).filter(s => s) : [];
+
+// Validate image URLs
+for (const url of imagesArr) {
+  if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("/cloud/")) {
+    alert("Image URLs must start with http://, https://, or /cloud/");
+    return;
+  }
+}
+
+const materialsRaw = document.getElementById("materials").value.trim();
+const materialsArr = materialsRaw ? materialsRaw.split(",").map(s => s.trim()).filter(s => s) : [];
+
 const productData = {
-
-name: document.getElementById("name").value,
-price: document.getElementById("price").value,
-collection: document.getElementById("collection").value,
-image: document.getElementById("image").value,
-description: document.getElementById("description").value
-
+name: document.getElementById("name").value.trim(),
+slug: document.getElementById("slug").value.trim() || undefined,
+price: parseFloat(document.getElementById("price").value),
+currency: document.getElementById("currency").value.trim() || "EUR",
+collection_id: document.getElementById("collectionId").value || undefined,
+category: document.getElementById("category").value.trim() || undefined,
+images: imagesArr,
+materials: materialsArr,
+description: document.getElementById("description").value.trim(),
+in_stock: document.getElementById("inStock").checked,
+featured: document.getElementById("featured").checked
 };
 
+// Validate required fields
+if (!productData.name) {
+  alert("Product name is required");
+  return;
+}
+if (isNaN(productData.price) || productData.price < 0) {
+  alert("Price must be a positive number");
+  return;
+}
+
+// Remove undefined fields for cleaner payload
+Object.keys(productData).forEach(key => {
+if(productData[key] === undefined) delete productData[key];
+});
 
 try{
 
+let res;
+
 if(productId){
 
-await fetch(`https://api.nobelian.com/products/${productId}`,{
-
+res = await fetch(`${API_BASE}/products/${encodeURIComponent(productId)}`,{
 method:"PUT",
-
 headers:{
 "Content-Type":"application/json",
 Authorization:`Bearer ${token}`
 },
-
 body: JSON.stringify(productData)
-
 });
 
 }else{
 
-await fetch("https://api.nobelian.com/products",{
-
+res = await fetch(`${API_BASE}/products`,{
 method:"POST",
-
 headers:{
 "Content-Type":"application/json",
 Authorization:`Bearer ${token}`
 },
-
 body: JSON.stringify(productData)
-
 });
 
 }
 
+if (res.status === 401) {
+  localStorage.removeItem("admin_token");
+  window.location.href = "/login.html?reason=unauthorized";
+  return;
+}
+
+if (!res.ok) {
+  const err = await res.json();
+  throw new Error(err.error || err.message || "Save failed");
+}
 
 window.location.href="/products.html";
 
 }catch(err){
-
 console.error("Save product error:",err);
-
+alert("Failed to save product: " + err.message);
 }
 
 });
@@ -219,11 +336,7 @@ console.error("Save product error:",err);
 
 
 document.getElementById("logoutButton").addEventListener("click",()=>{
-
-localStorage.removeItem("admin_token");
-
-window.location.href="/login.html";
-
+Auth.logout();
 });
 
 </script>

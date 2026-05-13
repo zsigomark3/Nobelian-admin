@@ -4,9 +4,12 @@
 <meta charset="UTF-8">
 <title>Nobelian Admin - Products</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https://nobelian-be.fly.dev data:; connect-src https://nobelian-be.fly.dev; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';">
 
 <link rel="stylesheet" href="css/admin.css">
 
+<script defer src="js/security.js"></script>
+<script defer src="js/api.js"></script>
 <script defer src="js/auth.js"></script>
 <script defer src="js/products.js"></script>
 
@@ -41,6 +44,10 @@ Collections
 
 <a href="/media.html" class="nav-item">
 Media
+</a>
+
+<a href="/orders.html" class="nav-item">
+Orders
 </a>
 
 </nav>
@@ -80,7 +87,7 @@ Logout
 <th>Image</th>
 <th>Name</th>
 <th>Price</th>
-<th>Collection</th>
+<th>Category</th>
 <th>Actions</th>
 </tr>
 </thead>
@@ -100,110 +107,6 @@ Logout
 </div>
 
 </div>
-
-
-<script>
-
-const token = localStorage.getItem("admin_token");
-
-if(!token){
-window.location.href="/login.html";
-}
-
-
-async function loadProducts(){
-
-try{
-
-const response = await fetch("https://api.nobelian.com/products",{
-headers:{
-Authorization:`Bearer ${token}`
-}
-});
-
-const products = await response.json();
-
-const table = document.getElementById("productsTableBody");
-
-table.innerHTML="";
-
-products.forEach(product=>{
-
-const row = document.createElement("tr");
-
-row.innerHTML=`
-
-<td>
-<img src="${product.image || ''}" class="product-thumb">
-</td>
-
-<td>
-${product.name}
-</td>
-
-<td>
-€ ${product.price}
-</td>
-
-<td>
-${product.collection || "-"}
-</td>
-
-<td>
-
-<a href="/product-edit.html?id=${product.id}" class="edit-btn">
-Edit
-</a>
-
-<button onclick="deleteProduct('${product.id}')" class="delete-btn">
-Delete
-</button>
-
-</td>
-
-`;
-
-table.appendChild(row);
-
-});
-
-}catch(err){
-
-console.error("Products load error:",err);
-
-}
-
-}
-
-
-async function deleteProduct(id){
-
-if(!confirm("Delete this product?")) return;
-
-await fetch(`https://api.nobelian.com/products/${id}`,{
-method:"DELETE",
-headers:{
-Authorization:`Bearer ${token}`
-}
-});
-
-loadProducts();
-
-}
-
-
-document.getElementById("logoutButton").addEventListener("click",()=>{
-
-localStorage.removeItem("admin_token");
-
-window.location.href="/login.html";
-
-});
-
-
-loadProducts();
-
-</script>
 
 </body>
 </html>

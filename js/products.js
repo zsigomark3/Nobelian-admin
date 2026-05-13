@@ -1,5 +1,7 @@
 /* =========================================
    Nobelian Backoffice - Products Module
+   
+   Depends on: security.js, api.js, auth.js
 ========================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -10,6 +12,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
 });
 
+
+/* =========================================
+   Resolve media URL (relative -> absolute)
+========================================= */
+
+function resolveProductImageUrl(url) {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  return API_BASE.replace("/api", "") + url;
+}
 
 
 /* =========================================
@@ -50,33 +64,34 @@ async function loadProducts() {
 
       const row = document.createElement("tr");
 
+      const imageUrl = product.images && product.images[0]
+        ? resolveProductImageUrl(product.images[0])
+        : "";
+
+      const safeName = escapeHtml(product.name);
+      const safeCategory = escapeHtml(product.category || "-");
+      const safeId = escapeAttr(product.id);
+      const safeImageUrl = escapeAttr(imageUrl);
+
       row.innerHTML = `
         <td>
-          <img src="${product.image || ''}" class="product-thumb">
+          ${imageUrl ? `<img src="${safeImageUrl}" class="product-thumb" alt="${safeName}">` : "-"}
         </td>
 
-        <td>
-          ${product.name}
-        </td>
+        <td>${safeName}</td>
+
+        <td>€ ${escapeHtml(String(product.price))}</td>
+
+        <td>${safeCategory}</td>
 
         <td>
-          € ${product.price}
-        </td>
-
-        <td>
-          ${product.collection || "-"}
-        </td>
-
-        <td>
-
-          <a href="/product-edit.html?id=${product.id}" class="edit-btn">
+          <a href="/product-edit.html?id=${safeId}" class="edit-btn">
             Edit
           </a>
 
-          <button class="delete-btn" data-id="${product.id}">
+          <button class="delete-btn" data-id="${safeId}">
             Delete
           </button>
-
         </td>
       `;
 
@@ -123,7 +138,7 @@ function attachDeleteHandlers() {
 
       try {
 
-        await API.delete(`/products/${id}`);
+        await API.delete(`/products/${encodeURIComponent(id)}`);
 
         loadProducts();
 

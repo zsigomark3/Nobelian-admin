@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Nobelian Admin - Orders</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://nobelian-be.fly.dev data:; connect-src https://nobelian-be.fly.dev; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';">
+
+<link rel="stylesheet" href="css/admin.css">
+<script defer src="js/security.js"></script>
+<script defer src="js/api.js"></script>
+<script defer src="js/auth.js"></script>
+
+</head>
+
+<body>
+
+<div class="admin-layout">
+
+<!-- SIDEBAR -->
+
+<aside class="sidebar">
+
+<div class="sidebar-logo">
+<h2>Nobelian</h2>
+<p>Admin</p>
+</div>
+
+<nav class="sidebar-nav">
+
+<a href="/dashboard.html" class="nav-item">
+Dashboard
+</a>
+
+<a href="/products.html" class="nav-item">
+Products
+</a>
+
+<a href="/collections.html" class="nav-item">
+Collections
+</a>
+
+<a href="/media.html" class="nav-item">
+Media
+</a>
+
+<a href="/orders.html" class="nav-item active">
+Orders
+</a>
+
+</nav>
+
+<div class="sidebar-footer">
+<button id="logoutButton" class="logout-button">Logout</button>
+</div>
+
+</aside>
+
+
+<!-- MAIN CONTENT -->
+
+<div class="main-content">
+
+<header class="topbar">
+<h1>Orders</h1>
+</header>
+
+
+<section class="orders-content">
+
+<table class="products-table">
+
+<thead>
+<tr>
+<th>Order ID</th>
+<th>Customer</th>
+<th>Total</th>
+<th>Status</th>
+<th>Date</th>
+<th>Actions</th>
+</tr>
+</thead>
+
+<tbody id="ordersTableBody">
+<tr>
+<td colspan="6">Loading orders...</td>
+</tr>
+</tbody>
+
+</table>
+
+</section>
+
+</div>
+
+</div>
+
+
+<script>
+
+const token = localStorage.getItem("admin_token");
+
+if(!token){
+window.location.href="/login.html";
+}
+
+document.getElementById("logoutButton").addEventListener("click",()=>{
+Auth.logout();
+});
+
+
+async function loadOrders(){
+const table = document.getElementById("ordersTableBody");
+
+try {
+const res = await fetch(`${API_BASE}/admin/orders`, {
+headers: { Authorization: `Bearer ${token}` }
+});
+
+if (res.status === 401) {
+  localStorage.removeItem("admin_token");
+  window.location.href = "/login.html?reason=unauthorized";
+  return;
+}
+
+const orders = await res.json();
+
+if(!orders || orders.length === 0){
+table.innerHTML = `<tr><td colspan="6">No orders found</td></tr>`;
+return;
+}
+
+table.innerHTML = "";
+
+orders.forEach(order => {
+const row = document.createElement("tr");
+const date = new Date(order.created_at).toLocaleDateString();
+
+const safeId = escapeAttr(order.id);
+const safeName = escapeHtml(order.shipping_address ? order.shipping_address.name : "N/A");
+const safeTotal = escapeHtml(order.total.toFixed(2));
+const safeDate = escapeHtml(date);
+const shortId = escapeHtml(order.id.substring(0, 8));
+
+row.innerHTML = `
+<td>${shortId}...</td>
+<td>${safeName}</td>
+<td>€ ${safeTotal}</td>
+<td>
+  <select class="status-select" data-id="${safeId}">
+    <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>Pending</option>
+    <option value="confirmed" ${order.status === 'confirmed' ? 'selected' : ''}>Confirmed</option>
+    <option value="shipped" ${order.status === 'shipped' ? 'selected' : ''}>Shipped</option>
+    <option value="delivered" ${order.status === 'delivered' ? 'selected' : ''}>Delivered</option>
+    <option value="cancelled" ${order.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+  </select>
+</td>
+<td>${safeDate}</td>
+<td>
+  <button class="delete-btn" data-id="${safeId}">Delete</button>
+</td>
+`;
+
+table.appendChild(row);
+});
+
+attachHandlers();
+
+} catch(err) {
+console.error("Orders load error:", err);
+table.innerHTML = `<tr><td colspan="6">Failed to load orders</td></tr>`;
+}
+}
+
+
+function attachHandlers(){
+
+// Status change handlers
+document.querySelectorAll(".status-select").forEach(select => {
+select.addEventListener("change", async (e) => {
+const id = e.target.dataset.id;
+const status = e.target.value;
+
+// Validate status value (whitelist)
+const validStatuses = ["pending", "confirmed", "shipped", "delivered", "cancelled"];
+if (!validStatuses.includes(status)) return;
+
+try {
+await fetch(`${API_BASE}/admin/orders/${encodeURIComponent(id)}/status`, {
+  method: "PUT",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`
+  },
+  body: JSON.stringify({ status })
+});
+} catch(err) {
+console.error("Status update error:", err);
+alert("Failed to update status");
+loadOrders();
+}
+});
+});
+
+// Delete handlers
+document.querySelectorAll(".delete-btn").forEach(btn => {
+btn.addEventListener("click", async () => {
+const id = btn.dataset.id;
+if(!confirm("Delete this order?")) return;
+
+try {
+await fetch(`${API_BASE}/admin/orders/${encodeURIComponent(id)}`, {
+  method: "DELETE",
+  headers: { Authorization: `Bearer ${token}` }
+});
+loadOrders();
+} catch(err) {
+console.error("Delete order error:", err);
+alert("Failed to delete order");
+}
+});
+});
+}
+
+
+loadOrders();
+
+</script>
+
+</body>
+</html>

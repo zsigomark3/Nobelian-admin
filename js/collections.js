@@ -1,5 +1,7 @@
 /* =========================================
    Nobelian Backoffice - Collections Module
+   
+   Depends on: security.js, api.js, auth.js
 ========================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -50,15 +52,16 @@ async function loadCollections() {
 
       const row = document.createElement("tr");
 
+      const safeName = escapeHtml(collection.name);
+      const safeId = escapeAttr(collection.id);
+
       row.innerHTML = `
-        <td>${collection.name}</td>
+        <td>${safeName}</td>
 
         <td>
-
-          <button class="delete-btn" data-id="${collection.id}">
+          <button class="delete-btn" data-id="${safeId}">
             Delete
           </button>
-
         </td>
       `;
 
@@ -101,6 +104,12 @@ function setupCreateCollection() {
 
     if (!name) {
       alert("Enter collection name");
+      return;
+    }
+
+    // Client-side length validation
+    if (name.length > 100) {
+      alert("Collection name must be 100 characters or less");
       return;
     }
 
@@ -147,7 +156,7 @@ function attachDeleteHandlers() {
 
       try {
 
-        await API.delete(`/collections/${id}`);
+        await API.delete(`/collections/${encodeURIComponent(id)}`);
 
         loadCollections();
 

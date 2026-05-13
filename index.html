@@ -4,10 +4,11 @@
   <meta charset="UTF-8">
   <title>Nobelian Admin</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self'; img-src 'self'; connect-src https://nobelian-be.fly.dev; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';">
 
   <link rel="stylesheet" href="css/admin.css">
 
-  <script defer src="js/auth.js"></script>
+  <script defer src="js/security.js"></script>
 </head>
 
 <body>
@@ -24,9 +25,19 @@
 
     if (!token) {
       window.location.href = "/login.html";
-    } else {
-      window.location.href = "/dashboard.html";
+      return;
     }
+
+    // Validate token before redirecting to dashboard
+    if (typeof TokenUtils !== "undefined") {
+      if (TokenUtils.isExpired(token) || !TokenUtils.isAdmin(token)) {
+        localStorage.removeItem("admin_token");
+        window.location.href = "/login.html?reason=expired";
+        return;
+      }
+    }
+
+    window.location.href = "/dashboard.html";
 
   });
 </script>

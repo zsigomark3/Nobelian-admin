@@ -19,33 +19,8 @@ function initializeAdmin() {
     Auth.requireAuth();
   }
 
-  setupLogout();
   highlightActiveNav();
   loadDashboardStats();
-
-}
-
-
-/* =========================================
-   Logout
-========================================= */
-
-function setupLogout() {
-
-  const logoutBtn = document.getElementById("logoutButton");
-
-  if (!logoutBtn) return;
-
-  logoutBtn.addEventListener("click", () => {
-
-    if (typeof Auth !== "undefined") {
-      Auth.logout();
-    } else {
-      localStorage.removeItem("admin_token");
-      window.location.href = "/login.html";
-    }
-
-  });
 
 }
 
@@ -85,25 +60,31 @@ async function loadDashboardStats() {
 
   const productsEl = document.getElementById("totalProducts");
   const collectionsEl = document.getElementById("totalCollections");
+  const imagesEl = document.getElementById("totalImages");
+  const ordersEl = document.getElementById("totalOrders");
 
-  if (!productsEl && !collectionsEl) return;
+  if (!productsEl && !collectionsEl && !imagesEl && !ordersEl) return;
 
   try {
 
     if (productsEl) {
-
       const products = await API.get("/products");
-
       productsEl.innerText = products.length;
-
     }
 
     if (collectionsEl) {
-
       const collections = await API.get("/collections");
-
       collectionsEl.innerText = collections.length;
+    }
 
+    if (imagesEl) {
+      const media = await API.get("/media");
+      imagesEl.innerText = media.length;
+    }
+
+    if (ordersEl) {
+      const orders = await API.get("/admin/orders");
+      ordersEl.innerText = orders.length;
     }
 
   } catch (error) {
