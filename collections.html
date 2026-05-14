@@ -69,17 +69,61 @@ Orders
 
 <section class="collection-create">
 
-<h3>Create Collection</h3>
+<h3 id="collectionFormTitle">Create Collection</h3>
 
+<div class="form-group">
+<label for="collectionName">Name</label>
 <input 
 type="text"
 id="collectionName"
 placeholder="Collection name"
 maxlength="100">
+</div>
 
+<div class="form-group">
+<label for="collectionSlug">Slug (optional, auto-generated if empty)</label>
+<input 
+type="text"
+id="collectionSlug"
+placeholder="e.g. art-collection"
+maxlength="100"
+pattern="[a-z0-9\-]*">
+</div>
+
+<div class="form-group">
+<label for="collectionDescription">Description</label>
+<textarea 
+id="collectionDescription"
+placeholder="Collection description"
+rows="3"
+maxlength="1000"></textarea>
+</div>
+
+<div class="form-group">
+<label for="collectionCoverImage">Cover Image URL (optional)</label>
+<input 
+type="text"
+id="collectionCoverImage"
+placeholder="https://... or /cloud/..."
+maxlength="500">
+</div>
+
+<div class="form-group">
+<label>
+<input type="checkbox" id="collectionFeatured"> Featured
+</label>
+</div>
+
+<div class="form-actions">
 <button id="createCollectionButton" class="create-button">
 Create
 </button>
+<button id="cancelEditButton" class="cancel-button" style="display:none;">
+Cancel
+</button>
+</div>
+
+<input type="hidden" id="editCollectionId" value="">
 
 </section>
 
@@ -93,6 +137,8 @@ Create
 <thead>
 <tr>
 <th>Name</th>
+<th>Slug</th>
+<th>Featured</th>
 <th>Actions</th>
 </tr>
 </thead>
@@ -100,7 +146,7 @@ Create
 <tbody id="collectionsTable">
 
 <tr>
-<td colspan="2">Loading collections...</td>
+<td colspan="4">Loading collections...</td>
 </tr>
 
 </tbody>
