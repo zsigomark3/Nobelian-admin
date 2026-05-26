@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Nobelian Admin - Analytics</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self'; img-src 'self' https://nobelian-be.fly.dev https://assets.nobelian.com data:; connect-src https://nobelian-be.fly.dev; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';">
+
+<link rel="icon" type="image/svg+xml" href="https://assets.nobelian.com/icons/nobelian_pict.svg">
+<link rel="stylesheet" href="css/admin.css">
+<script defer src="js/security.js"></script>
+<script defer src="js/api.js"></script>
+<script defer src="js/auth.js"></script>
+</head>
+
+<body>
+
+<div class="admin-layout">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+<div class="sidebar-logo">
+<h2>Nobelian</h2>
+<p>Admin</p>
+</div>
+
+<nav class="sidebar-nav">
+<a href="/dashboard.html" class="nav-item">Dashboard</a>
+<a href="/products.html" class="nav-item">Products</a>
+<a href="/collections.html" class="nav-item">Collections</a>
+<a href="/media.html" class="nav-item">Media</a>
+<a href="/orders.html" class="nav-item">Orders</a>
+<a href="/customers.html" class="nav-item">Customers</a>
+<a href="/analytics.html" class="nav-item active">Analytics</a>
+</nav>
+
+<div class="sidebar-footer">
+<button id="logoutButton" class="logout-button">Logout</button>
+</div>
+</aside>
+
+
+<!-- MAIN CONTENT -->
+<div class="main-content">
+
+<header class="topbar">
+<h1>Analytics</h1>
+</header>
+
+<section class="analytics-content">
+
+<!-- KPI Cards -->
+<div class="stats-grid" id="kpiCards">
+<div class="stat-card">
+<h3>Total Revenue</h3>
+<p id="kpiRevenue">--</p>
+</div>
+<div class="stat-card">
+<h3>Total Orders</h3>
+<p id="kpiOrders">--</p>
+</div>
+<div class="stat-card">
+<h3>Total Customers</h3>
+<p id="kpiCustomers">--</p>
+</div>
+<div class="stat-card">
+<h3>Total Products</h3>
+<p id="kpiProducts">--</p>
+</div>
+</div>
+
+<!-- Revenue Chart -->
+<div class="analytics-section">
+<h2>Monthly Revenue</h2>
+<div class="chart-container" id="revenueChart"></div>
+</div>
+
+<!-- Orders by Status -->
+<div class="analytics-row">
+<div class="analytics-section half">
+<h2>Orders by Status</h2>
+<div class="chart-container" id="statusChart"></div>
+</div>
+<div class="analytics-section half">
+<h2>Payment Status</h2>
+<div class="chart-container" id="paymentChart"></div>
+</div>
+</div>
+
+<!-- Top Products -->
+<div class="analytics-section">
+<h2>Top Products</h2>
+<table class="products-table" id="topProductsTable">
+<thead>
+<tr>
+<th>#</th>
+<th>Product</th>
+<th>Qty Sold</th>
+<th>Revenue</th>
+</tr>
+</thead>
+<tbody id="topProductsBody">
+<tr><td colspan="4">Loading...</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- New Customers -->
+<div class="analytics-section">
+<h2>New Customers by Month</h2>
+<div class="chart-container" id="customersChart"></div>
+</div>
+
+<!-- Recent Orders -->
+<div class="analytics-section">
+<h2>Recent Orders</h2>
+<table class="products-table">
+<thead>
+<tr>
+<th>Order ID</th>
+<th>Customer</th>
+<th>Total</th>
+<th>Status</th>
+<th>Date</th>
+</tr>
+</thead>
+<tbody id="recentOrdersBody">
+<tr><td colspan="5">Loading...</td></tr>
+</tbody>
+</table>
+</div>
+
+</section>
+
+</div>
+
+</div>
+
+
+<script>
+
+Auth.requireAuth();
+const token = Auth.getToken();
+
+document.getElementById("logoutButton").addEventListener("click", () => {
+  Auth.logout();
+});
+
+async function loadAnalytics() {
+  try {
+    const data = await API.get("/admin/analytics");
+
+    // KPI Cards
+    document.getElementById("kpiRevenue").innerText = `€ ${data.total_revenue.toFixed(2)}`;
+    document.getElementById("kpiOrders").innerText = data.total_orders;
+    document.getElementById("kpiCustomers").innerText = data.total_customers;
+    document.getElementById("kpiProducts").innerText = data.total_products;
+
+    // Revenue Chart (bar chart using CSS)
+    renderBarChart("revenueChart", data.revenue_by_month, "revenue", "€");
+
+    // Orders by Status
+    renderPieList("statusChart", data.orders_by_status);
+
+    // Payment Status
+    renderPieList("paymentChart", data.orders_by_payment_status);
+
+    // Top Products
+    renderTopProducts(data.top_products);
+
+    // New Customers Chart
+    renderBarChart("customersChart", data.new_customers_by_month, "count", "");
+
+    // Recent Orders
+    renderRecentOrders(data.recent_orders);
+
+  } catch (err) {
+    console.error("Analytics load error:", err);
+  }
+}
+
+function renderBarChart(containerId, data, valueKey, prefix) {
+  const container = document.getElementById(containerId);
+  if (!data || data.length === 0) {
+    container.innerHTML = "<p>No data available</p>";
+    return;
+  }
+
+  const maxVal = Math.max(...data.map(d => d[valueKey]));
+
+  let html = '<div class="bar-chart">';
+  data.forEach(item => {
+    const pct = maxVal > 0 ? (item[valueKey] / maxVal) * 100 : 0;
+    const label = escapeHtml(item.month);
+    const value = valueKey === "revenue" ? `${prefix}${item[valueKey].toFixed(0)}` : `${item[valueKey]}`;
+
+    html += `
+      <div class="bar-row">
+        <span class="bar-label">${label}</span>
+        <div class="bar-track">
+          <div class="bar-fill" style="width: ${pct}%"></div>
+        </div>
+        <span class="bar-value">${value}</span>
+      </div>
+    `;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderPieList(containerId, data) {
+  const container = document.getElementById(containerId);
+  if (!data || data.length === 0) {
+    container.innerHTML = "<p>No data available</p>";
+    return;
+  }
+
+  const total = data.reduce((sum, d) => sum + d.count, 0);
+  const colors = ["#2ecc71", "#3498db", "#f39c12", "#e74c3c", "#9b59b6", "#1abc9c"];
+
+  let html = '<div class="status-list">';
+  data.forEach((item, i) => {
+    const pct = total > 0 ? ((item.count / total) * 100).toFixed(1) : 0;
+    const color = colors[i % colors.length];
+    const label = escapeHtml(item.status);
+
+    html += `
+      <div class="status-row">
+        <span class="status-dot" style="background: ${color}"></span>
+        <span class="status-label">${label}</span>
+        <span class="status-count">${item.count}</span>
+        <span class="status-pct">${pct}%</span>
+      </div>
+    `;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderTopProducts(products) {
+  const tbody = document.getElementById("topProductsBody");
+  if (!products || products.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4">No product sales data</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = "";
+  products.forEach((p, i) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${i + 1}</td>
+      <td>${escapeHtml(p.name)}</td>
+      <td>${p.quantity_sold}</td>
+      <td>€ ${p.revenue.toFixed(2)}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+function renderRecentOrders(orders) {
+  const tbody = document.getElementById("recentOrdersBody");
+  if (!orders || orders.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5">No recent orders</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = "";
+  orders.forEach(order => {
+    const row = document.createElement("tr");
+    const date = new Date(order.created_at).toLocaleDateString();
+    row.innerHTML = `
+      <td>${escapeHtml(order.id.substring(0, 8))}...</td>
+      <td>${escapeHtml(order.customer_name)}</td>
+      <td>€ ${order.total.toFixed(2)}</td>
+      <td><span class="badge badge-${order.status}">${escapeHtml(order.status)}</span></td>
+      <td>${escapeHtml(date)}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+loadAnalytics();
+
+</script>
+
+</body>
+</html>

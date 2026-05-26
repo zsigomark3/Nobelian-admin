@@ -49,6 +49,14 @@ Media
 Orders
 </a>
 
+<a href="/customers.html" class="nav-item">
+Customers
+</a>
+
+<a href="/analytics.html" class="nav-item">
+Analytics
+</a>
+
 </nav>
 
 <div class="sidebar-footer">
@@ -64,6 +72,10 @@ Orders
 
 <header class="topbar">
 <h1>Orders</h1>
+<div class="topbar-actions">
+<button id="exportCsvBtn" class="create-button">Export CSV</button>
+<button id="exportExcelBtn" class="create-button" style="margin-left:8px;">Export Excel</button>
+</div>
 </header>
 
 
@@ -99,7 +111,8 @@ Orders
 
 <script>
 
-const token = localStorage.getItem("admin_token");
+Auth.requireAuth();
+const token = Auth.getToken();
 
 if(!token){
 window.location.href="/login.html";
@@ -225,6 +238,118 @@ alert("Failed to delete order");
 
 
 loadOrders();
+
+
+// ─── Export Functions ─────────────────────────────────────────────────────────
+
+document.getElementById("exportCsvBtn").addEventListener("click", async () => {
+  try {
+    const res = await fetch(`${API_BASE}/admin/orders/export/csv`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.status === 401) {
+      localStorage.removeItem("admin_token");
+      window.location.href = "/login.html?reason=unauthorized";
+      return;
+    }
+    const blob = await res.blob();
+    downloadBlob(blob, "nobelian-orders.csv", "text/csv");
+  } catch (err) {
+    console.error("CSV export error:", err);
+    alert("Failed to export CSV");
+  }
+});
+
+document.getElementById("exportExcelBtn").addEventListener("click", async () => {
+  try {
+    const res = await fetch(`${API_BASE}/admin/orders`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.status === 401) {
+      localStorage.removeItem("admin_token");
+      window.location.href = "/login.html?reason=unauthorized";
+      return;
+    }
+    const orders = await res.json();
+    const excelContent = generateExcelXML(orders);
+    const blob = new Blob([excelContent], { type: "application/vnd.ms-excel" });
+    downloadBlob(blob, "nobelian-orders.xls", "application/vnd.ms-excel");
+  } catch (err) {
+    console.error("Excel export error:", err);
+    alert("Failed to export Excel");
+  }
+});
+
+function downloadBlob(blob, filename, mimeType) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function generateExcelXML(orders) {
+  let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+  xml += '<?mso-application progid="Excel.Sheet"?>\n';
+  xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n';
+  xml += ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
+  xml += '<Worksheet ss:Name="Orders">\n<Table>\n';
+
+  // Header row
+  xml += '<Row>\n';
+  const headers = ["Order ID", "Customer", "Street", "City", "ZIP", "Country", "Phone", "Items", "Total", "Currency", "Status", "Payment Method", "Payment Status", "Notes", "Date"];
+  headers.forEach(h => {
+    xml += '<Cell><Data ss:Type="String">' + xmlEscape(h) + '</Data></Cell>\n';
+  });
+  xml += '</Row>\n';
+
+  // Data rows
+  orders.forEach(order => {
+    xml += '<Row>\n';
+    const addr = order.shipping_address || {};
+    const items = (order.items || []).map(i => i.name + " x" + i.quantity).join("; ");
+    const date = new Date(order.created_at).toLocaleDateString();
+
+    const cells = [
+      order.id,
+      addr.name || "N/A",
+      addr.street || "",
+      addr.city || "",
+      addr.zip || "",
+      addr.country || "",
+      addr.phone || "",
+      items,
+      order.total.toFixed(2),
+      order.currency || "EUR",
+      order.status,
+      order.payment_method,
+      order.payment_status,
+      order.notes || "",
+      date
+    ];
+
+    cells.forEach(function(cell, i) {
+      const type = (i === 8) ? "Number" : "String";
+      xml += '<Cell><Data ss:Type="' + type + '">' + xmlEscape(String(cell)) + '</Data></Cell>\n';
+    });
+    xml += '</Row>\n';
+  });
+
+  xml += '</Table>\n</Worksheet>\n</Workbook>';
+  return xml;
+}
+
+function xmlEscape(str) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
 
 </script>
 

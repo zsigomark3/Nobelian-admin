@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Nobelian Admin - Customers</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://nobelian-be.fly.dev https://assets.nobelian.com data:; connect-src https://nobelian-be.fly.dev; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';">
+
+<link rel="icon" type="image/svg+xml" href="https://assets.nobelian.com/icons/nobelian_pict.svg">
+<link rel="stylesheet" href="css/admin.css">
+<script defer src="js/security.js"></script>
+<script defer src="js/api.js"></script>
+<script defer src="js/auth.js"></script>
+</head>
+
+<body>
+
+<div class="admin-layout">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+<div class="sidebar-logo">
+<h2>Nobelian</h2>
+<p>Admin</p>
+</div>
+
+<nav class="sidebar-nav">
+<a href="/dashboard.html" class="nav-item">Dashboard</a>
+<a href="/products.html" class="nav-item">Products</a>
+<a href="/collections.html" class="nav-item">Collections</a>
+<a href="/media.html" class="nav-item">Media</a>
+<a href="/orders.html" class="nav-item">Orders</a>
+<a href="/customers.html" class="nav-item active">Customers</a>
+<a href="/analytics.html" class="nav-item">Analytics</a>
+</nav>
+
+<div class="sidebar-footer">
+<button id="logoutButton" class="logout-button">Logout</button>
+</div>
+</aside>
+
+
+<!-- MAIN CONTENT -->
+<div class="main-content">
+
+<header class="topbar">
+<h1>Customers</h1>
+<div class="topbar-actions">
+<input type="text" id="searchInput" placeholder="Search by name or email..." class="search-input">
+<select id="roleFilter" class="role-filter">
+<option value="">All Roles</option>
+<option value="user">User</option>
+<option value="admin">Admin</option>
+</select>
+</div>
+</header>
+
+<section class="customers-content">
+
+<div class="customers-summary" id="customersSummary"></div>
+
+<table class="products-table">
+<thead>
+<tr>
+<th>Username</th>
+<th>Email</th>
+<th>Role</th>
+<th>Orders</th>
+<th>Total Spent</th>
+<th>Registered</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="customersTableBody">
+<tr><td colspan="7">Loading customers...</td></tr>
+</tbody>
+</table>
+
+<div class="pagination" id="pagination"></div>
+
+</section>
+
+</div>
+
+</div>
+
+
+<script>
+
+Auth.requireAuth();
+const token = Auth.getToken();
+
+document.getElementById("logoutButton").addEventListener("click", () => {
+  Auth.logout();
+});
+
+let currentPage = 1;
+const pageLimit = 25;
+
+async function loadCustomers() {
+  const table = document.getElementById("customersTableBody");
+  const search = document.getElementById("searchInput").value.trim();
+  const role = document.getElementById("roleFilter").value;
+
+  let url = `/admin/customers?page=${currentPage}&limit=${pageLimit}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  if (role) url += `&role=${encodeURIComponent(role)}`;
+
+  table.innerHTML = `<tr><td colspan="7">Loading...</td></tr>`;
+
+  try {
+    const data = await API.get(url);
+    const customers = data.customers;
+    const total = data.total;
+
+    // Summary
+    document.getElementById("customersSummary").innerHTML = `
+      <span class="summary-badge">Total: <strong>${total}</strong> customers</span>
+    `;
+
+    if (!customers || customers.length === 0) {
+      table.innerHTML = `<tr><td colspan="7">No customers found</td></tr>`;
+      document.getElementById("pagination").innerHTML = "";
+      return;
+    }
+
+    table.innerHTML = "";
+
+    customers.forEach(customer => {
+      const row = document.createElement("tr");
+      const date = new Date(customer.created_at).toLocaleDateString();
+      const safeId = escapeAttr(customer.id);
+      const safeName = escapeHtml(customer.username);
+      const safeEmail = escapeHtml(customer.email);
+      const safeRole = escapeHtml(customer.role);
+      const safeDate = escapeHtml(date);
+
+      const roleBadge = customer.role === "admin"
+        ? `<span class="badge badge-admin">Admin</span>`
+        : `<span class="badge badge-user">User</span>`;
+
+      row.innerHTML = `
+        <td>${safeName}</td>
+        <td>${safeEmail}</td>
+        <td>${roleBadge}</td>
+        <td>${customer.order_count}</td>
+        <td>€ ${customer.total_spent.toFixed(2)}</td>
+        <td>${safeDate}</td>
+        <td>
+          <button class="delete-btn" data-id="${safeId}" ${customer.role === 'admin' ? 'disabled title="Cannot delete admin"' : ''}>Delete</button>
+        </td>
+      `;
+      table.appendChild(row);
+    });
+
+    // Pagination
+    const totalPages = Math.ceil(total / pageLimit);
+    renderPagination(totalPages);
+
+    // Delete handlers
+    document.querySelectorAll(".delete-btn:not([disabled])").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+        if (!confirm("Delete this customer? This cannot be undone.")) return;
+        try {
+          await API.delete(`/admin/customers/${encodeURIComponent(id)}`);
+          loadCustomers();
+        } catch (err) {
+          console.error("Delete customer error:", err);
+          alert("Failed to delete customer: " + err.message);
+        }
+      });
+    });
+
+  } catch (err) {
+    console.error("Customers load error:", err);
+    table.innerHTML = `<tr><td colspan="7">Failed to load customers</td></tr>`;
+  }
+}
+
+function renderPagination(totalPages) {
+  const container = document.getElementById("pagination");
+  if (totalPages <= 1) {
+    container.innerHTML = "";
+    return;
+  }
+
+  let html = "";
+  if (currentPage > 1) {
+    html += `<button class="page-btn" data-page="${currentPage - 1}">← Prev</button>`;
+  }
+  html += `<span class="page-info">Page ${currentPage} of ${totalPages}</span>`;
+  if (currentPage < totalPages) {
+    html += `<button class="page-btn" data-page="${currentPage + 1}">Next →</button>`;
+  }
+  container.innerHTML = html;
+
+  container.querySelectorAll(".page-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      currentPage = parseInt(btn.dataset.page);
+      loadCustomers();
+    });
+  });
+}
+
+// Search with debounce
+let searchTimeout;
+document.getElementById("searchInput").addEventListener("input", () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    currentPage = 1;
+    loadCustomers();
+  }, 400);
+});
+
+document.getElementById("roleFilter").addEventListener("change", () => {
+  currentPage = 1;
+  loadCustomers();
+});
+
+loadCustomers();
+
+</script>
+
+</body>
+</html>

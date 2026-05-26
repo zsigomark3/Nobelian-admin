@@ -12,8 +12,10 @@ The admin panel provides:
 
 - **Products** – Create, edit, delete products with full metadata (price, images, materials, category, stock status)
 - **Collections** – Create and delete product collections
-- **Media** – Upload and manage product images (JPEG, PNG, GIF, WebP, SVG, AVIF)
-- **Orders** – View all orders, update order status, delete orders
+- **Media** – Upload and manage product images with folders, drag & drop reorder, rename/alt text editing, and image optimization (resize, WebP conversion)
+- **Orders** – View all orders, update order status, delete orders, export to CSV/Excel
+- **Customers** – Browse, search, and manage registered customers with order history stats
+- **Analytics** – Revenue trends, order status breakdown, top products, customer growth
 - **Dashboard** – Overview with product/collection/media counts
 
 ---
@@ -55,7 +57,9 @@ Nobelian-admin/
 ├── product-edit.html   # Product create/edit form
 ├── collections.html    # Collections management
 ├── media.html          # Media upload & library
-├── orders.html         # Order management
+├── orders.html         # Order management + CSV/Excel export
+├── customers.html      # Customer database management
+├── analytics.html      # Analytics dashboard
 ├── css/
 │   └── admin.css       # All admin styles
 └── js/
@@ -90,14 +94,27 @@ All endpoints are prefixed with `https://nobelian-be.fly.dev/api`
 - `DELETE /api/collections/:id` – Delete collection (admin)
 
 **Media**
-- `GET /api/media` – List all media files
-- `POST /api/media` – Upload image (multipart/form-data, admin)
+- `GET /api/media` – List all media files (supports `?folder=` filter)
+- `GET /api/media/folders` – List all unique folder names
+- `POST /api/media` – Upload image (multipart/form-data, admin) — supports `folder` and `alt_text` fields
+- `PUT /api/media/:id` – Update media metadata (alt_text, original_name, folder, sort_order)
+- `PUT /api/media/reorder` – Bulk reorder media items (admin)
+- `POST /api/media/:id/optimize` – Optimize image: resize and/or convert format (admin)
 - `DELETE /api/media/:id` – Delete media file (admin)
 
 **Orders (Admin)**
 - `GET /api/admin/orders` – List all orders
 - `PUT /api/admin/orders/:id/status` – Update order status
 - `DELETE /api/admin/orders/:id` – Delete order
+- `GET /api/admin/orders/export/csv` – Export orders as CSV file
+
+**Customers (Admin)**
+- `GET /api/admin/customers` – List all customers (with search, role filter, pagination)
+- `GET /api/admin/customers/:id` – Get customer details
+- `DELETE /api/admin/customers/:id` – Delete customer
+
+**Analytics (Admin)**
+- `GET /api/admin/analytics` – Get analytics data (revenue, orders, top products, etc.)
 
 ---
 
@@ -169,8 +186,6 @@ Admin endpoints on the backend require a valid JWT with admin role.
 
 ## Future Features
 
-- Customer database
-- Analytics dashboard
 - Inventory tracking
 - Role-based permissions
 - Content management system
